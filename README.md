@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-web%20profile-lightgrey)
-![Version](https://img.shields.io/badge/version-0.1.1-brightgreen)
+![Version](https://img.shields.io/badge/version-0.2.0-brightgreen)
 
 Adds **Image2 (`gpt-image-2`) generation** to [DeepSeek Harness](https://github.com/deepseek-ai):
 text-to-image and image-to-image through any **OpenAI Images-compatible relay API**.
@@ -43,17 +43,43 @@ AI to call `image2-generate`. [中文说明](./README.zh-CN.md)
 - Derives the image-edit endpoint as `/images/edits` (optional explicit `editURL`).
 - `image2-generate` — text-to-image, 1–8 images, sequential requests (no concurrency).
 - `image2-edit` — image-to-image with 1–8 PNG / JPEG / WebP reference images.
-- Adaptive sizes from prompt keywords (portrait / landscape / square) plus validated
-  custom `WIDTHxHEIGHT` (16px multiples, ≤ 3840 edge, 655,360–8,294,400 px², ratio ≤ 3:1).
 - Quality levels `low` / `medium` / `high` / `auto` (depends on relay support).
 - In-conversation tool card with thumbnails, zoom and Save As; files also saved to
   `outputs/image2/image2-<timestamp>[-N].<ext>`, auto-numbered on name collision.
+- **Chat-dock studio** (🎨 above the input box): text-to-image, image-to-image with
+  click/drag-drop upload, and a **multi-view character** mode — upload 2–8 photos of
+  the same person from different angles and generate new shots that keep the person's
+  face, build and hairstyle consistent (multi-source-image `edits` semantics).
+- Sizes: adaptive from prompt keywords, `auto` passthrough, gateway-friendly presets
+  (`1024x1024` / `1536x1024` / `1024x1536` / `3840x2160` …) and validated custom
+  `WIDTHxHEIGHT` (16px multiples, ≤ 3840 edge, 655,360–8,294,400 px², ratio ≤ 3:1).
 - API key stored in DSH credentials only — never in the plain settings document and
   never returned by the plugin state endpoint. (Or set the `IMAGE2_API_KEY` env var.)
 - Validates settings writes, response sizes, timeouts and input images; HTTP 524 and
   timeouts are **not** auto-retried, avoiding duplicate upstream charges.
 
-## Fork changes (v0.1.1, vs upstream v0.1.0)
+## Fork changes
+
+**v0.2.0**
+
+- Size handling aligned with OpenAI Images spec used by common relays (e.g. zzz /
+  OpenAI-compatible gateways): `auto` is passed through as-is; portrait/landscape
+  presets moved from `768x1024/1024x768` to gateway-safe `1024x1536/1536x1024`;
+  documented presets `1024x1024 / 1536x1024 / 1024x1536 / 3840x2160` short-circuit
+  validation and go straight to the API.
+- `/images/edits` now always sends **repeated standard `image` fields** for multiple
+  source images (previously a non-standard `image[]` field for >1 image). This matches
+  the OpenAI multi-source-image semantics and unblocks **multi-view character
+  consistency** (several photos of the same person → one new image of that person).
+- New chat-dock **🎨 studio** (`conversation.input.dock`): text-to-image /
+  image-to-image / multi-view character tabs, click & drag-drop upload with previews,
+  an "assemble consistency prompt" helper, background task + polling, and result
+  gallery with Save As. Studio results live in `~/.dsh/storages/image2-draw/library/`
+  (survives restarts), independent from conversation-tool outputs.
+- Clearer "no key / wrong group" message (keys must belong to the relay's Image group
+  when the relay separates models by token group).
+
+**v0.1.1 (vs upstream v0.1.0)**
 
 - Removed the non-standard `output_format` field from the generations payload — some
   OpenAI-compatible gateways reject it (standard params only: `model/prompt/size/quality/n`).
@@ -130,6 +156,8 @@ Restart `dsh web`; the card and tools disappear (images already saved to
 3. Adjust model / edit endpoint / timeout only if needed; defaults usually work.
 4. Save, start a new session, and ask the model to call `image2-generate`, or pass
    reference-image paths to `image2-edit`.
+5. Prefer the graphical way for image inputs: open the **🎨 Image2 生图工作台** above
+   the input box, pick a tab (文生图 / 图生图 / 多视角人物), drop images in and generate.
 
 Example prompts:
 
@@ -143,7 +171,9 @@ Call image2-edit with D:\images\room.png and restyle the room with light Japanes
 
 Whether the relay actually supports `gpt-image-2`, editing, custom sizes and quality
 levels is up to the provider. HTTP 400 / 404 → check the provider's model name and
-Images endpoint format. `region-unavailable` → the relay blocks your exit IP region;
+Images endpoint format. Size errors → most gateways accept only `auto` / `1024x1024` /
+`1536x1024` / `1024x1536` / `3840x2160`; pick a preset instead of a custom `WIDTHxHEIGHT`.
+`region-unavailable` → the relay blocks your exit IP region;
 switch to an overseas proxy or another provider.
 
 ## Limits
