@@ -1,0 +1,4 @@
+# Mount the host and Web client halves of the image2 draw plugin.
+- insert:
+    - id: image2-draw
+      name: dsh-image2-draw

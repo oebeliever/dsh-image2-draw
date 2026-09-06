@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.*
+!.env.example
+outputs/
+coverage/
+*.log
+*.tgz
+package-lock.json
+pnpm-lock.yaml
+.DS_Store
+Thumbs.db

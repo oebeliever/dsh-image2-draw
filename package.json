@@ -1,0 +1,79 @@
+{
+  "name": "dsh-image2-draw",
+  "version": "0.1.1",
+  "description": "Image2 (gpt-image-2) generation plugin for DeepSeek Harness with simple relay settings and in-conversation image previews. Community fork of JuneLearn/dsh-image2-draw with gateway compatibility fixes.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oebeliever/dsh-image2-draw.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oebeliever/dsh-image2-draw/issues"
+  },
+  "homepage": "https://github.com/oebeliever/dsh-image2-draw#readme",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-plugins",
+        "@deepseek-ai/dsh-client-ui-tool",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-attachment": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-credentials": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-settings": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-tools": "0.1.0-rc.6"
+  },
+  "author": "oebeliever",
+  "contributors": [
+    "JuneLearn (original author)"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "image-generation",
+    "text-to-image",
+    "image-to-image",
+    "gpt-image-2",
+    "openai-images"
+  ],
+  "files": [
+    "lib",
+    "assets",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh-CN.md",
+    "THIRD_PARTY_NOTICES.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node tests/plugin.test.mjs"
+  }
+}
