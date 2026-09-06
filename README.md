@@ -71,6 +71,8 @@ AI to call `image2-generate`. [中文说明](./README.zh-CN.md)
   source images (previously a non-standard `image[]` field for >1 image). This matches
   the OpenAI multi-source-image semantics and unblocks **multi-view character
   consistency** (several photos of the same person → one new image of that person).
+  `refs` also accepts **conversation attachment ids (`sha256:…`)** directly — the
+  plugin reads them from the attachment store, no local paths or vision tool needed.
 - New chat-dock **🎨 studio** (`conversation.input.dock`): text-to-image /
   image-to-image / multi-view character tabs, click & drag-drop upload with previews,
   an "assemble consistency prompt" helper, background task + polling, and result
