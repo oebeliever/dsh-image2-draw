@@ -60,6 +60,19 @@ AI to call `image2-generate`. [中文说明](./README.zh-CN.md)
 
 ## Fork changes
 
+**v0.2.1 (preset library)**
+
+- Built-in templates: character-design **Sheet A** (face close-up + shirtless physique +
+  outfit action pose) and **Sheet B** (outfit-on-body wear crops) prompts with a
+  `{outfit}` variable; the **multi-view → per-outfit sheets (confirm each)** flow; the
+  **six-outfit list** (zh/en) derived from the reference photos.
+- User presets persist to `~/.dsh/storages/image2-draw/presets.json`; the 🎨 studio gains
+  a **📚 template bar**: load presets with variable filling, save the current prompt as
+  a template, preview/copy flow & list bodies, delete user presets.
+- New chat tool `image2-preset` (`list` / `get` / `save`) so the agent can reuse
+  templates — e.g. run the character-design flow one sheet at a time, waiting for user
+  confirmation between sheets.
+
 **v0.2.0**
 
 - Size handling aligned with OpenAI Images spec used by common relays (e.g. zzz /
