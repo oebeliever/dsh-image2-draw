@@ -558,7 +558,7 @@ assert.equal(installCalls.length, 1)
 assert.equal(installCalls[0].ns, 'image2-draw')
 assert.equal(typeof installCalls[0].hooks.validate, 'function')
 assert.throws(() => installCalls[0].hooks.validate({ timeoutSeconds: 0 }), /1~3600/)
-assert.deepEqual(registrations.tools.map(tool => tool.name), ['image2-generate', 'image2-edit'])
+assert.deepEqual(registrations.tools.map(tool => tool.name), ['image2-generate', 'image2-edit', 'image2-preset'])
 assert.equal(registrations.routes.length, 0)
 assert.deepEqual(pendingInjections.map(entry => entry.services), [['webServer']])
 const webInjection = pendingInjections[0]
@@ -639,6 +639,6 @@ await server.apply({
   inject() {},
   effect(callback) { return callback() },
 }, {})
-assert.deepEqual(realTools.map(tool => tool.name), ['image2-generate', 'image2-edit'])
+assert.deepEqual(realTools.map(tool => tool.name), ['image2-generate', 'image2-edit', 'image2-preset'])
 
 console.log('plugin tests passed')
