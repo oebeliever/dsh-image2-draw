@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -322,6 +322,37 @@ assert.throws(
   () => server.__test.readReferenceImages(['not-image.png'], { agent: { session: { header: { cwd: refsDir } } } }),
   /PNG\/JPEG\/WebP/,
 )
+
+// 会话图片附件直读：sha256: id → <home>/attachments/v1/objects/<前2位>/<hex>
+const attachHome = mkdtempSync(join(tmpdir(), 'dsh-image2-attach-'))
+const attachId = `sha256:${'a'.repeat(62)}bc`
+const attachHex = attachId.slice(7)
+const attachObjDir = join(attachHome, 'attachments', 'v1', 'objects', attachHex.slice(0, 2))
+mkdirSync(attachObjDir, { recursive: true })
+writeFileSync(join(attachObjDir, attachHex), pngBytes)
+assert.equal(server.__test.attachmentIdHexOf(attachId), attachHex)
+assert.equal(server.__test.attachmentIdHexOf('sha256:nothex'), null)
+assert.equal(
+  server.__test.attachmentObjectPathOf(attachId, attachHome),
+  join(attachObjDir, attachHex),
+)
+const attachPart = server.__test.readAttachmentImage(attachId, attachHome)
+assert.equal(attachPart.mime, 'image/png')
+assert.equal(attachPart.bytes.length, pngBytes.length)
+assert.throws(() => server.__test.readAttachmentImage('sha256:zzz', attachHome), /附件 id 不合法/)
+assert.throws(
+  () => server.__test.readAttachmentImage(`sha256:${'f'.repeat(64)}`, attachHome),
+  /附件不可读/,
+)
+// 混合解析：本地路径 + 附件 id
+const mixed = server.__test.refsToParts(['reference.jpg', attachId], {
+  agent: { session: { header: { cwd: refsDir } } },
+}, attachHome)
+assert.equal(mixed.length, 2)
+assert.equal(mixed[0].mime, 'image/png')
+assert.equal(mixed[1].mime, 'image/png')
+assert.throws(() => server.__test.refsToParts([], undefined, attachHome), /至少需要一张参考图/)
+assert.throws(() => server.__test.refsToParts(Array(9).fill(attachId), undefined, attachHome), /最多 8 张/)
 
 const originalFetch = globalThis.fetch
 globalThis.fetch = async () => new Response('missing', { status: 404 })
