@@ -768,4 +768,82 @@ assert.deepEqual(realTools.map(tool => tool.name), ['image2-generate', 'image2-e
   assert.equal(nextStartIndex(5, 0, 0), 0)
 }
 
+/* --------------------------- callWithFailover --------------------------- */
+
+{
+  const core = await import(new URL('../lib/core.js', import.meta.url).href)
+  const { callWithFailover, errorFromHttp } = core
+  const mk = count => Array.from({ length: count }, (_, i) => ({ name: `E${i}`, baseURL: `https://e${i}.example/v1` }))
+  const httpError = status => Object.assign(new Error(`HTTP ${status}`), { status })
+
+  // errorFromHttp 现在带 status
+  assert.equal(errorFromHttp(404, Buffer.from('nope')).status, 404)
+
+  // 首个即成功:不碰后面的端点
+  let calls = []
+  let outcome = await callWithFailover(mk(3), 0, async (endpoint, index) => { calls.push(index); return `ok${index}` })
+  assert.deepEqual(calls, [0])
+  assert.equal(outcome.value, 'ok0')
+  assert.equal(outcome.usedIndex, 0)
+  assert.equal(outcome.endpoint.baseURL, 'https://e0.example/v1')
+  assert.deepEqual(outcome.attempts, [])
+
+  // 从指针 2 起环形回绕:2 挂 → 0 挂 → 1 成功
+  calls = []
+  outcome = await callWithFailover(mk(3), 2, async (endpoint, index) => {
+    calls.push(index)
+    if (index === 2) throw httpError(503)
+    if (index === 0) throw httpError(401)
+    return index
+  })
+  assert.deepEqual(calls, [2, 0, 1])
+  assert.equal(outcome.usedIndex, 1)
+  assert.equal(outcome.attempts.length, 2)
+  assert.deepEqual(outcome.attempts.map(item => item.index), [2, 0])
+  assert.equal(outcome.attempts[0].name, 'E2')
+  assert.equal(outcome.attempts[0].error.status, 503)
+
+  // 起点越界 → 从 0 开始
+  calls = []
+  await callWithFailover(mk(2), 9, async (endpoint, index) => { calls.push(index); return index })
+  assert.deepEqual(calls, [0])
+
+  // 参数类错误(400):立即抛出,不试后续端点
+  calls = []
+  await assert.rejects(
+    () => callWithFailover(mk(3), 0, async (endpoint, index) => { calls.push(index); throw httpError(400) }),
+    /HTTP 400/,
+  )
+  assert.deepEqual(calls, [0])
+
+  // 全失败 → AggregateError,消息含每个端点的名称/地址/原因
+  const aggregate = await callWithFailover(mk(2), 0, async (endpoint, index) => {
+    throw httpError(index === 0 ? 500 : 401)
+  }).then(() => null, error => error)
+  assert.equal(aggregate instanceof AggregateError, true)
+  assert.equal(aggregate.errors.length, 2)
+  assert.match(aggregate.message, /全部 2 个端点均失败/)
+  assert.match(aggregate.message, /E0/)
+  assert.match(aggregate.message, /https:\/\/e1\.example\/v1/)
+  assert.match(aggregate.message, /HTTP 401/)
+  assert.doesNotMatch(aggregate.message, /重复计费/)
+
+  // 含 524 / 超时 → 追加重复计费提示
+  const dup = await callWithFailover(mk(1), 0, async () => { throw httpError(524) }).then(() => null, error => error)
+  assert.match(dup.message, /重复计费/)
+  const timeout = await callWithFailover(mk(1), 0, async () => {
+    throw Object.assign(new Error('aborted'), { name: 'AbortError' })
+  }).then(() => null, error => error)
+  assert.match(timeout.message, /重复计费/)
+
+  // rotate:false → 固定从 0 起(起点指针被忽略)
+  calls = []
+  outcome = await callWithFailover(mk(3), 2, async (endpoint, index) => { calls.push(index); return index }, { rotate: false })
+  assert.deepEqual(calls, [0])
+  assert.equal(outcome.usedIndex, 0)
+
+  // 空端点列表 → 直接报错
+  await assert.rejects(() => callWithFailover([], 0, async () => 'x'), /没有可用端点/)
+}
+
 console.log('plugin tests passed')
