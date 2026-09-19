@@ -740,4 +740,32 @@ assert.deepEqual(realTools.map(tool => tool.name), ['image2-generate', 'image2-e
   assert.throws(() => validateEndpoints([{ baseURL: 'https://a.example/v1', editURL: 'ftp://x' }]), /合法|http/i)
 }
 
+/* --------------------------- 故障转移判定 / 指针推进 --------------------------- */
+
+{
+  const core = await import(new URL('../lib/core.js', import.meta.url).href)
+  const { shouldFailover, nextStartIndex } = core
+  const withStatus = status => Object.assign(new Error(`HTTP ${status}`), { status })
+
+  for (const status of [401, 402, 403, 404, 408, 429, 500, 502, 503, 524]) {
+    assert.equal(shouldFailover(withStatus(status)), true, `HTTP ${status} 应触发切换`)
+  }
+  for (const status of [400, 422, 418, 451]) {
+    assert.equal(shouldFailover(withStatus(status)), false, `HTTP ${status} 不应触发切换`)
+  }
+  // 无状态码:连接失败 / DNS / 超时 / 响应非 JSON / 解码失败
+  assert.equal(shouldFailover(new Error('fetch failed')), true)
+  assert.equal(shouldFailover(Object.assign(new Error('aborted'), { name: 'AbortError' })), true)
+  assert.equal(shouldFailover(undefined), true)
+
+  assert.equal(nextStartIndex(0, 2, 3), 2)
+  assert.equal(nextStartIndex(2, 2, 3), 2)
+  assert.equal(nextStartIndex(1, null, 3), 1)      // 全失败：保持原值
+  assert.equal(nextStartIndex(1, undefined, 3), 1)
+  assert.equal(nextStartIndex(1, 7, 3), 1)         // 越界：保持原值
+  assert.equal(nextStartIndex(3, 1, 3), 1)         // 起点越界但 used 合法：移到 used
+  assert.equal(nextStartIndex(0, 0, 0), 0)         // 空列表防御
+  assert.equal(nextStartIndex(5, 0, 0), 0)
+}
+
 console.log('plugin tests passed')
