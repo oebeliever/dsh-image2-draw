@@ -676,4 +676,68 @@ assert.deepEqual(realTools.map(tool => tool.name), ['image2-generate', 'image2-e
   assert.equal(index.name, 'image2-draw')
 }
 
+/* --------------------------- 端点归一化 / 校验 --------------------------- */
+
+{
+  const core = await import(new URL('../lib/core.js', import.meta.url).href)
+  const { resolveEndpoints, validateEndpoints, MAX_ENDPOINTS } = core
+  assert.equal(MAX_ENDPOINTS, 8)
+
+  // 向后兼容:旧单端点字段 → 单元素数组
+  const legacy = resolveEndpoints({
+    baseURL: 'https://a.example/v1',
+    model: 'gpt-image-2',
+    editURL: 'https://a.example/v1/images/edits',
+    apiKeyEnv: 'K1',
+  })
+  assert.equal(legacy.length, 1)
+  assert.deepEqual(legacy[0], {
+    name: '',
+    baseURL: 'https://a.example/v1',
+    model: 'gpt-image-2',
+    editURL: 'https://a.example/v1/images/edits',
+    apiKey: undefined,
+    apiKeyEnv: 'K1',
+  })
+
+  // 新数组形态:原样归一,缺省字段补 undefined / ''
+  const multi = resolveEndpoints({
+    endpoints: [
+      { name: '主', baseURL: 'https://a.example/v1' },
+      { baseURL: 'https://b.example/v1', model: 'm2', apiKey: 'sk-literal' },
+    ],
+  })
+  assert.equal(multi.length, 2)
+  assert.equal(multi[0].name, '主')
+  assert.equal(multi[0].model, undefined)
+  assert.equal(multi[1].name, '')
+  assert.equal(multi[1].model, 'm2')
+  assert.equal(multi[1].apiKey, 'sk-literal')
+  assert.equal(multi[1].apiKeyEnv, undefined)
+
+  // 空数组 / 非数组 → 回落单端点;全空的 settings → 一个空端点(交由下游报"未配置接口地址")
+  assert.equal(resolveEndpoints({ endpoints: [], baseURL: 'https://a.example/v1' }).length, 1)
+  assert.equal(resolveEndpoints({ endpoints: 'x', baseURL: 'https://a.example/v1' })[0].baseURL, 'https://a.example/v1')
+  assert.equal(resolveEndpoints({}).length, 1)
+  assert.equal(resolveEndpoints(undefined).length, 1)
+
+  // 数组里夹带 null / 字符串 → 丢弃,只留对象
+  assert.equal(resolveEndpoints({ endpoints: [null, 'x', { baseURL: 'https://a.example/v1' }] }).length, 1)
+
+  // validateEndpoints
+  assert.doesNotThrow(() => validateEndpoints(undefined))
+  assert.doesNotThrow(() => validateEndpoints([{ baseURL: 'https://a.example/v1' }]))
+  assert.throws(() => validateEndpoints('x'), /必须是数组/)
+  assert.throws(
+    () => validateEndpoints(Array.from({ length: 9 }, () => ({ baseURL: 'https://a.example/v1' }))),
+    /最多 8 个/,
+  )
+  assert.throws(() => validateEndpoints([null]), /必须是对象/)
+  assert.throws(() => validateEndpoints([{ baseURL: '' }]), /baseURL 不能为空/)
+  assert.throws(() => validateEndpoints([{ baseURL: 'notaurl' }]), /合法|http/i)
+  assert.throws(() => validateEndpoints([{ baseURL: 'https://a.example/v1', apiKeyEnv: '1bad' }]), /环境变量式名称/)
+  assert.throws(() => validateEndpoints([{ baseURL: 'https://a.example/v1', name: 'x'.repeat(41) }]), /最长 40/)
+  assert.throws(() => validateEndpoints([{ baseURL: 'https://a.example/v1', editURL: 'ftp://x' }]), /合法|http/i)
+}
+
 console.log('plugin tests passed')
