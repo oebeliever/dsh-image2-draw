@@ -641,4 +641,39 @@ await server.apply({
 }, {})
 assert.deepEqual(realTools.map(tool => tool.name), ['image2-generate', 'image2-edit', 'image2-preset'])
 
+/* --------------------------- core.js 守卫 --------------------------- */
+
+{
+  const coreUrl = new URL('../lib/core.js', import.meta.url)
+  assert.equal(existsSync(coreUrl), true, 'lib/core.js 应存在')
+
+  const coreSource = await readFile(coreUrl, 'utf8')
+  const external = [...coreSource.matchAll(/^\s*import\s[^\n]*?from\s+'([^']+)'/gm)]
+    .map(match => match[1])
+    .filter(specifier => !specifier.startsWith('node:') && !specifier.startsWith('.'))
+  assert.deepEqual(external, [], `core.js 只能依赖 node 内置或相对路径,发现:${external.join(', ')}`)
+
+  const core = await import(coreUrl.href)
+  for (const name of [
+    'objectOf', 'isCredentialRef', 'normalizeGenerationsUrl', 'editUrlOf', 'timeoutMsOf',
+    'validateSettings', 'adaptiveSize', 'resolveSize', 'buildGeneratePayload', 'buildEditForm',
+    'detectedImageType', 'detectedExtension', 'availablePath', 'saveBlob',
+    'attachmentIdHexOf', 'dshHomeOf', 'readAttachmentImage', 'refsToParts',
+    'errorFromHttp', 'postJson', 'postForm', 'downloadImage', 'decodeImages', 'combinedSignal',
+  ]) {
+    assert.equal(typeof core[name], 'function', `core.js 应导出函数 ${name}`)
+  }
+  assert.equal(core.DEFAULT_MODEL, 'gpt-image-2')
+  assert.equal(core.DEFAULT_KEY_ENV, 'IMAGE2_API_KEY')
+  assert.equal(core.DEFAULT_OUTPUT_DIR, 'outputs/image2')
+  assert.equal(core.QUALITIES.join(','), 'low,medium,high,auto')
+
+  // index.js 的对外导出面不得因搬家而缩小(抽查跨层符号)。
+  const index = await import(new URL('../lib/index.js', import.meta.url).href)
+  for (const name of ['name', 'inject', 'resolveSize', 'refsToParts', 'saveBlob', 'validateSettings']) {
+    assert.notEqual(index[name], undefined, `index.js 应仍导出 ${name}`)
+  }
+  assert.equal(index.name, 'image2-draw')
+}
+
 console.log('plugin tests passed')
