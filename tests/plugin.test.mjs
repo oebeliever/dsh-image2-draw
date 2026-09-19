@@ -846,4 +846,38 @@ assert.deepEqual(realTools.map(tool => tool.name), ['image2-generate', 'image2-e
   await assert.rejects(() => callWithFailover([], 0, async () => 'x'), /没有可用端点/)
 }
 
+/* --------------------------- 起点指针状态读写 --------------------------- */
+
+{
+  const core = await import(new URL('../lib/core.js', import.meta.url).href)
+  const { readStartIndex, writeStartIndex } = core
+  const dir = mkdtempSync(join(tmpdir(), 'image2-state-'))
+  const statePath = join(dir, 'nested', 'endpoints-state.json')
+
+  // 不存在 → 0
+  assert.equal(readStartIndex(statePath), 0)
+
+  // 写入(自动建目录)后读回
+  writeStartIndex(statePath, 2)
+  assert.equal(readStartIndex(statePath), 2)
+  assert.equal(JSON.parse(readFileSync(statePath, 'utf8')).startIndex, 2)
+
+  // 损坏内容 → 0
+  writeFileSync(statePath, '{ 坏掉的 json')
+  assert.equal(readStartIndex(statePath), 0)
+
+  // 结构不对 → 0
+  writeFileSync(statePath, JSON.stringify({ startIndex: -3 }))
+  assert.equal(readStartIndex(statePath), 0)
+  writeFileSync(statePath, JSON.stringify({ startIndex: 'x' }))
+  assert.equal(readStartIndex(statePath), 0)
+
+  // 父路径是文件 → 静默失败,不抛
+  writeFileSync(join(dir, 'blocker'), 'x')
+  assert.doesNotThrow(() => writeStartIndex(join(dir, 'blocker', 'state.json'), 1))
+
+  // 目录不可写时读取也不抛(路径指向目录)
+  assert.equal(readStartIndex(dir), 0)
+}
+
 console.log('plugin tests passed')
