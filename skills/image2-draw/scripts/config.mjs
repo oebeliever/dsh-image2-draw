@@ -50,6 +50,11 @@ export function endpointsFromFile(text) {
   } catch {
     return undefined
   }
+  // 配置文件允许携带端点之外的顶层键（如 timeoutSeconds）。这类对象既不是 {"endpoints":[…]} 信封、
+  // 也不是含 baseURL 的裸单端点：若把它当成"一个没有地址的端点"，会卡住 baseURL 校验（并给出指向
+  // 环境变量的错误提示），而且**永远走不到 DSH 回落** —— 直接返回 undefined，让解析继续往下回落。
+  const plainObject = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+  if (plainObject && parsed.endpoints === undefined && parsed.baseURL === undefined) return undefined
   const list = normalizeList(unwrapEnvelope(parsed))
   return list.length === 0 ? undefined : list
 }

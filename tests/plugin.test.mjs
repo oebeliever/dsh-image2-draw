@@ -898,6 +898,7 @@ assert.deepEqual(realTools.map(tool => tool.name), ['image2-generate', 'image2-e
   assert.equal(endpointsFromFile('{"endpoints":[{"baseURL":"https://a.example/v1"}]}').length, 1)
   assert.equal(endpointsFromFile('{"baseURL":"https://a.example/v1"}').length, 1)     // 裸单端点
   assert.equal(endpointsFromFile('{{'), undefined)
+  assert.equal(endpointsFromFile('{"timeoutSeconds":900}'), undefined)
 
   // DSH 回落:只认扁平字段
   const dshYaml = [
