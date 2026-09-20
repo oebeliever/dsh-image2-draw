@@ -112,8 +112,15 @@ async function main() {
   for (let index = 1; index <= args.count; index += 1) {
     const outcome = await core.callWithFailover(resolved.endpoints, start, async endpoint => {
       const model = endpoint.model ?? core.DEFAULT_MODEL
-      const apiKey = String(endpoint.apiKey ?? '').trim()
-      if (apiKey === '') throw new Error(`端点 ${endpoint.baseURL} 没有可用密钥（apiKey / apiKeyEnv 均未提供可用值）`)
+      // apiKey 优先；否则把 apiKeyEnv 当作**环境变量名**解析（Claude Code 侧没有凭据库，只有环境变量）。
+      // ⚠️ 与 DSH 侧语义不同：DSH 的 apiKeyEnv 是 ~/.dsh/.credentials.yaml 的引用名，由 ctx.credentials 解析。
+      const envKey = endpoint.apiKeyEnv ? process.env[endpoint.apiKeyEnv] : undefined
+      const apiKey = String(endpoint.apiKey ?? envKey ?? '').trim()
+      if (apiKey === '') {
+        throw new Error(
+          `端点 ${endpoint.baseURL} 没有可用密钥（apiKey 为空，且 apiKeyEnv=${endpoint.apiKeyEnv ?? '(未设置)'} 未指向非空环境变量）`,
+        )
+      }
       if (parts.length > 0) {
         const form = core.buildEditForm({ model }, { prompt: args.prompt, size, quality: args.quality }, parts)
         const result = await core.postForm(core.editUrlOf(endpoint), apiKey, form, timeoutMs)
