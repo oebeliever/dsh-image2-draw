@@ -1,0 +1,10 @@
+{
+  "name": "image2-draw",
+  "version": "0.3.0",
+  "description": "Generate and edit images via any OpenAI-Images-compatible relay (gpt-image-2): text-to-image, image-to-image with multi-reference character consistency, and automatic multi-endpoint failover.",
+  "author": { "name": "oebeliever" },
+  "homepage": "https://github.com/oebeliever/dsh-image2-draw",
+  "repository": "https://github.com/oebeliever/dsh-image2-draw",
+  "license": "MIT",
+  "keywords": ["image-generation", "gpt-image-2", "text-to-image", "image-to-image", "claude-code-skill"]
+}

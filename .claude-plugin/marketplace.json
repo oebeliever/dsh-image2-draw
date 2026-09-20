@@ -1,0 +1,17 @@
+{
+  "name": "dsh-image2-draw",
+  "owner": { "name": "oebeliever" },
+  "metadata": {
+    "description": "Claude Code plugin for image2-draw (gpt-image-2 text-to-image / image-to-image with multi-endpoint failover).",
+    "version": "0.3.0"
+  },
+  "plugins": [
+    {
+      "name": "image2-draw",
+      "source": "./",
+      "description": "Generate and edit images via any OpenAI-Images-compatible relay, with automatic multi-endpoint failover.",
+      "version": "0.3.0",
+      "category": "development"
+    }
+  ]
+}
