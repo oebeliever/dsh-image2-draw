@@ -880,4 +880,91 @@ assert.deepEqual(realTools.map(tool => tool.name), ['image2-generate', 'image2-e
   assert.equal(readStartIndex(dir), 0)
 }
 
+/* --------------------------- Claude Code 侧配置解析 --------------------------- */
+
+{
+  const { parseCliEndpoint, parseEndpointsJson, endpointsFromFile, endpointsFromDshSettings, resolveEndpointsFromSources }
+    = await import(new URL('../skills/image2-draw/scripts/config.mjs', import.meta.url).href)
+
+  assert.deepEqual(parseCliEndpoint('https://a.example/v1,sk-1'), { baseURL: 'https://a.example/v1', apiKey: 'sk-1' })
+  assert.deepEqual(parseCliEndpoint('https://a.example/v1'), { baseURL: 'https://a.example/v1', apiKey: undefined })
+  assert.deepEqual(parseCliEndpoint(' https://a.example/v1 , '), { baseURL: 'https://a.example/v1', apiKey: undefined })
+
+  assert.equal(parseEndpointsJson('[{"baseURL":"https://a.example/v1"}]').length, 1)
+  assert.equal(parseEndpointsJson('{"baseURL":"https://a.example/v1"}').length, 1)   // 单对象也接受
+  assert.equal(parseEndpointsJson('not json'), undefined)
+  assert.equal(parseEndpointsJson('[]'), undefined)
+
+  assert.equal(endpointsFromFile('{"endpoints":[{"baseURL":"https://a.example/v1"}]}').length, 1)
+  assert.equal(endpointsFromFile('{"baseURL":"https://a.example/v1"}').length, 1)     // 裸单端点
+  assert.equal(endpointsFromFile('{{'), undefined)
+
+  // DSH 回落:只认扁平字段
+  const dshYaml = [
+    'ui-onboarding:',
+    '  welcomeNoticeVersion: x',
+    'image2-draw:',
+    '  baseURL: https://dsh.example/v1',
+    '  timeoutSeconds: 900',
+    'llm-deepseek:',
+    '  models: []',
+  ].join('\n')
+  const fromDsh = endpointsFromDshSettings(dshYaml)
+  assert.equal(fromDsh.length, 1)
+  assert.equal(fromDsh[0].baseURL, 'https://dsh.example/v1')
+  assert.equal(endpointsFromDshSettings('image2-draw:\n  endpoints: [{ baseURL: x }]'), 'HAS_ENDPOINTS')
+  assert.equal(endpointsFromDshSettings('other:\n  x: 1'), undefined)
+
+  const readFile = file => ({
+    '/home/.claude/image2-draw.json': '{"endpoints":[{"name":"文件","baseURL":"https://file.example/v1"}]}',
+    '/home/.dsh/settings.yaml': dshYaml,
+    '/home/.dsh/.credentials.yaml': 'version: 1\nrefs:\n  IMAGE2_API_KEY: sk-from-dsh\n',
+  }[file])
+
+  // 优先级:CLI > env > 文件 > DSH
+  let resolved = resolveEndpointsFromSources({
+    cli: ['https://cli.example/v1,sk-cli'],
+    env: { IMAGE2_BASE_URL: 'https://env.example/v1', IMAGE2_API_KEY: 'sk-env' },
+    home: '/home',
+    readFile,
+  })
+  assert.equal(resolved.source, 'cli')
+  assert.equal(resolved.endpoints[0].baseURL, 'https://cli.example/v1')
+  assert.equal(resolved.endpoints[0].apiKey, 'sk-cli')
+
+  resolved = resolveEndpointsFromSources({ cli: [], env: { IMAGE2_ENDPOINTS: '[{"baseURL":"https://e.example/v1"}]' }, home: '/home', readFile })
+  assert.equal(resolved.source, 'env')
+  assert.equal(resolved.endpoints[0].baseURL, 'https://e.example/v1')
+
+  resolved = resolveEndpointsFromSources({ cli: [], env: { IMAGE2_BASE_URL: 'https://env.example/v1', IMAGE2_API_KEY: 'sk-env' }, home: '/home', readFile })
+  assert.equal(resolved.source, 'env-single')
+  assert.equal(resolved.endpoints[0].apiKey, 'sk-env')
+
+  resolved = resolveEndpointsFromSources({ cli: [], env: {}, home: '/home', readFile })
+  assert.equal(resolved.source, 'file')
+  assert.equal(resolved.endpoints[0].name, '文件')
+
+  // 文件不存在 → 回落 DSH,且凭据从 .credentials.yaml 解析进 apiKey
+  resolved = resolveEndpointsFromSources({
+    cli: [], env: {}, home: '/home',
+    readFile: file => (file.endsWith('image2-draw.json') ? undefined : readFile(file)),
+  })
+  assert.equal(resolved.source, 'dsh')
+  assert.equal(resolved.endpoints[0].baseURL, 'https://dsh.example/v1')
+  assert.equal(resolved.endpoints[0].apiKey, 'sk-from-dsh')
+
+  // DSH 侧配了 endpoints 但 CC 侧没配置 → 无端点 + 提示
+  resolved = resolveEndpointsFromSources({
+    cli: [], env: {}, home: '/home',
+    readFile: file => (file.endsWith('settings.yaml') ? 'image2-draw:\n  endpoints: [{ baseURL: x }]' : undefined),
+  })
+  assert.deepEqual(resolved.endpoints, [])
+  assert.match(resolved.notice, /image2-draw\.json/)
+
+  // 什么都没有 → 空端点 + 提示
+  resolved = resolveEndpointsFromSources({ cli: [], env: {}, home: '/home', readFile: () => undefined })
+  assert.deepEqual(resolved.endpoints, [])
+  assert.match(resolved.notice, /IMAGE2_API_KEY|image2-draw\.json/)
+}
+
 console.log('plugin tests passed')
