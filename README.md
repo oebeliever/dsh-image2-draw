@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-web%20profile-lightgrey)
-![Version](https://img.shields.io/badge/version-0.2.0-brightgreen)
+![Version](https://img.shields.io/badge/version-0.3.0-brightgreen)
 
 Adds **Image2 (`gpt-image-2`) generation** to [DeepSeek Harness](https://github.com/deepseek-ai):
 text-to-image and image-to-image through any **OpenAI Images-compatible relay API**.
@@ -38,6 +38,10 @@ AI to call `image2-generate`. [中文说明](./README.zh-CN.md)
 
 - Adds an **Image2 Draw** settings card under **Settings → Plugins → Plugin config**.
 - Requires only a `baseURL` and an `API Key`; default model is `gpt-image-2`.
+- **Multiple endpoints with automatic failover** — up to 8 relays; when one fails with a network
+  error / timeout / 401 / 402 / 403 / 404 / 429 / 5xx, the next is used automatically.
+- **The same repo is also a Claude Code plugin** — `skills/image2-draw` provides the skill, sharing
+  one core implementation with the DSH plugin.
 - Accepts a short base URL like `https://example.com/v1` and appends
   `/images/generations` automatically.
 - Derives the image-edit endpoint as `/images/edits` (optional explicit `editURL`).
@@ -163,6 +167,45 @@ dsh plugin --profile web remove dsh-image2-draw
 
 Restart `dsh web`; the card and tools disappear (images already saved to
 `outputs/image2/` are kept).
+
+## Claude Code installation
+
+This repo doubles as a Claude Code plugin (sharing `lib/core.js` with the DSH plugin).
+
+**Option 1 — plugin marketplace (recommended)**
+
+```
+/plugin marketplace add oebeliever/dsh-image2-draw
+/plugin install image2-draw@dsh-image2-draw
+```
+
+**Option 2 — copy the skill only**: put `skills/image2-draw/` into `~/.claude/skills/` (all projects)
+or `<project>/.claude/skills/` (one project).
+
+**Option 3 — DSH already configured**: nothing to do; the skill falls back to DSH's `baseURL` and credentials.
+
+Multi-endpoint config lives in `~/.claude/image2-draw.json`:
+
+```json
+{ "timeoutSeconds": 900,
+  "endpoints": [
+  { "name": "primary", "baseURL": "https://api.example.com/v1", "apiKey": "sk-…", "model": "gpt-image-2" },
+  { "name": "backup", "baseURL": "https://backup.example.com/v1", "apiKeyEnv": "IMAGE2_API_KEY_B" }
+] }
+```
+
+> The endpoint shape and failover rules match the DSH side. **Note `apiKeyEnv` means different things
+> on each side**: here it is an **environment-variable name** (so keys can stay out of the file);
+> on the DSH side it is a credential-store reference.
+> When falling back to DSH settings only the flat single-endpoint fields are read — use the JSON file
+> or env vars for multiple endpoints.
+
+Usage (just talk to Claude Code):
+
+```
+Use image2-draw to turn this photo into a cartoon figurine: C:\path\to\photo.jpg
+Generate a chibi shiba-inu figurine image, square, high quality
+```
 
 ## Usage
 

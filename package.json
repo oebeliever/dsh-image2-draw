@@ -1,6 +1,6 @@
 {
   "name": "dsh-image2-draw",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Image2 (gpt-image-2) generation plugin for DeepSeek Harness with simple relay settings, in-conversation previews, a chat-dock studio (text-to-image / image-to-image / multi-view character consistency) and a reusable prompt/flow preset library. Community fork of JuneLearn/dsh-image2-draw with gateway compatibility fixes.",
   "repository": {
     "type": "git",
@@ -66,6 +66,8 @@
   ],
   "files": [
     "lib",
+    "skills",
+    ".claude-plugin",
     "assets",
     "cordis.patch.yml",
     "README.md",

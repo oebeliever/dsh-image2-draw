@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-web%20profile-lightgrey)
-![Version](https://img.shields.io/badge/version-0.2.0-brightgreen)
+![Version](https://img.shields.io/badge/version-0.3.0-brightgreen)
 
 为 [DeepSeek Harness](https://github.com/deepseek-ai) 增加 **Image2（`gpt-image-2`）生图能力**：
 通过任意 **OpenAI Images 兼容**的中转接口，即可在对话中使用文生图与图生图。只需配置
@@ -51,6 +51,8 @@ curl -fsSL https://raw.githubusercontent.com/oebeliever/dsh-image2-draw/main/ins
 
 - 在“设置 > 插件 > 插件配置”中提供独立的 **Image2 生图**配置卡片；
 - 只需配置 `baseURL` 和 `API Key`；默认模型为 `gpt-image-2`；
+- **多端点 + 失效自动切换**：最多 8 个中转端点，某个因网络 / 超时 / 401 / 402 / 403 / 404 / 429 / 5xx 失败时自动换下一个；
+- **同一个仓库也是 Claude Code 插件**：`skills/image2-draw` 提供 skill，与 DSH 插件共用同一份核心实现；
 - `baseURL` 可填 `https://example.com/v1` 简写，插件自动补全 `/images/generations`；
 - 图生图端点默认由 `baseURL` 推导为 `/images/edits`，也可单独配置 `editURL`；
 - `image2-generate` 文生图：一次可生成 1~8 张，逐张顺序请求，不并发；
@@ -171,6 +173,41 @@ dsh plugin --profile web remove dsh-image2-draw
 ```
 
 重启后，“插件配置”中的 **Image2 生图**卡片与生图工具即被移除（已保存的图片文件保留）。
+
+## Claude Code 安装
+
+同一个仓库现在也是 Claude Code 插件（与 DSH 插件共用 `lib/core.js`）。
+
+**方式一：插件市场（推荐）**
+
+```
+/plugin marketplace add oebeliever/dsh-image2-draw
+/plugin install image2-draw@dsh-image2-draw
+```
+
+**方式二：手动装 skill** —— 把 `skills/image2-draw/` 复制到 `~/.claude/skills/`（所有项目可用）或 `<项目>/.claude/skills/`（仅该项目）。
+
+**方式三：本机已装 DSH 且配过插件** —— 无需额外配置，skill 会自动回落读取 DSH 的 `baseURL` 与凭据。
+
+多端点配置写在 `~/.claude/image2-draw.json`：
+
+```json
+{ "timeoutSeconds": 900,
+  "endpoints": [
+  { "name": "主", "baseURL": "https://api.example.com/v1", "apiKey": "sk-…", "model": "gpt-image-2" },
+  { "name": "备", "baseURL": "https://backup.example.com/v1", "apiKeyEnv": "IMAGE2_API_KEY_B" }
+] }
+```
+
+> 端点结构与故障转移规则与 DSH 侧一致。**注意 `apiKeyEnv` 在两边语义不同**：这里指**环境变量名**（脚本从环境取值，密钥可以不落盘），DSH 侧指的是凭据库引用名。
+> 读 DSH 配置时只支持单端点扁平字段；多端点请写上面的 JSON 或环境变量。
+
+用法（在 Claude Code 里直接说话即可）：
+
+```
+用 image2-draw 把这张照片做成卡通手办：C:\path\to\photo.jpg
+生成一张柴犬潮玩手办的图，方图，高质量
+```
 
 ## 使用
 
