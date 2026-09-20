@@ -191,6 +191,28 @@ Images endpoint format. Size errors → most gateways accept only `auto` / `1024
 `region-unavailable` → the relay blocks your exit IP region;
 switch to an overseas proxy or another provider.
 
+### Multiple endpoints with automatic failover
+
+Configure up to 8 endpoints in Settings → Plugins → Plugin config. They are tried in order;
+when one fails with **network error / timeout / 401 / 402 / 403 / 404 / 429 / 5xx (including 524)**,
+the next one is used automatically. **Parameter errors such as HTTP 400 never trigger a switch**
+(401/402/403/404/429 still do) — another endpoint would fail identically.
+
+- Each endpoint has its own credential reference (`IMAGE2_API_KEY`, `IMAGE2_API_KEY_2`, …) and optional `model`.
+- A failing endpoint is moved to the back: the next request starts from the endpoint that last succeeded.
+- If the fallback later fails, the primary is retried automatically (self-healing).
+- Set `IMAGE2_NO_ROTATE=1` to disable this memory and always start from the first endpoint.
+
+> ⚠️ A 524/timeout means the upstream **may still have generated an image**, so failing over can
+> double-bill. **When every endpoint fails**, the error message says so explicitly; a failover that
+> ends in success carries no extra warning — decide accordingly before regenerating.
+
+> ⚠️ **Always reference keys through credentials (`apiKeyEnv`) — never use the `apiKey` field.**
+> A literal `apiKey` lives server-side only: the settings panel can neither see nor edit it, and
+> **editing the endpoint list in the panel replaces the whole array, silently dropping any hand-written
+> literal** (generation then fails with "no key configured"). Need several keys? Create several
+> credential refs: `IMAGE2_API_KEY`, `IMAGE2_API_KEY_2`, …
+
 ## Limits
 
 - Text-to-image: 1–8 images per call, sent one by one.
